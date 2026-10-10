@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="100%" height="100%" fill="none" role="img" aria-labelledby="linkupLogoTitle linkupLogoDesc">
+  <title id="linkupLogoTitle">LinkUp Logo</title>
+  <desc id="linkupLogoDesc">Two connected people shaking hands inside a location pin in forest green, warm cream, golden yellow, and soft sage.</desc>
+  <defs>
+    <!-- Subtle soft gradient for depth -->
+    <linearGradient id="pinGradient" x1="20" y1="10" x2="100" y2="105" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2D6B54" />
+      <stop offset="100%" stop-color="#214E3D" />
+    </linearGradient>
+    <linearGradient id="accentArch" x1="35" y1="35" x2="85" y2="55" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F7F2E6" />
+      <stop offset="100%" stop-color="#E7B957" />
+    </linearGradient>
+  </defs>
+
+  <!-- Outer Pin Shadow/Backdrop -->
+  <path d="M60 110 C57 110, 20 74, 20 45 C20 22.9, 37.9 5, 60 5 C82.1 5, 100 22.9, 100 45 C100 74, 63 110, 60 110 Z" 
+        fill="url(#pinGradient)" />
+
+  <!-- Sage Inner Rim Accent -->
+  <path d="M60 102 C57.5 102, 26 71, 26 45 C26 26.2, 41.2 11, 60 11 C78.8 11, 94 26.2, 94 45 C94 71, 62.5 102, 60 102 Z" 
+        stroke="#A8C8AA" stroke-width="2.5" fill="none" opacity="0.65" />
+
+  <!-- Dark Inner Backdrop for high contrast -->
+  <circle cx="60" cy="45" r="30" fill="#172F24" />
+
+  <!-- Connecting Golden Bridge / Arch -->
+  <path d="M38 52 C38 35, 82 35, 82 52" 
+        stroke="#E7B957" stroke-width="4.5" stroke-linecap="round" fill="none" />
+
+  <!-- Left Figure: Head & Torso (Warm Cream) -->
+  <circle cx="43" cy="33" r="5" fill="#F7F2E6" />
+  <path d="M43 40 C37 40, 34 46, 34 54 L44 54 C44 49, 47 45, 52 45" 
+        fill="#F7F2E6" />
+
+  <!-- Right Figure: Head & Torso (Golden Yellow) -->
+  <circle cx="77" cy="33" r="5" fill="#E7B957" />
+  <path d="M77 40 C83 40, 86 46, 86 54 L76 54 C76 49, 73 45, 68 45" 
+        fill="#E7B957" />
+
+  <!-- Handshake Connection Link (Center Bridge) -->
+  <ellipse cx="60" cy="46" rx="6" ry="4" fill="#F7F2E6" />
+  <circle cx="60" cy="46" r="2.5" fill="#214E3D" />
+
+  <!-- Small Ground Marker Dot -->
+  <ellipse cx="60" cy="113" rx="10" ry="2.5" fill="#A8C8AA" opacity="0.4" />
+</svg>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none">
+  <!-- Simplified Pin for small favicon display -->
+  <path d="M16 30 C15 30, 4 20, 4 12 C4 5.37, 9.37 0, 16 0 C22.63 0, 28 5.37, 28 12 C28 20, 17 30, 16 30 Z" 
+        fill="#214E3D" />
+  <!-- Inner circular window -->
+  <circle cx="16" cy="12" r="8.5" fill="#172F24" />
+  <!-- Golden arch -->
+  <path d="M10 14 C10 9, 22 9, 22 14" stroke="#E7B957" stroke-width="2" stroke-linecap="round" fill="none" />
+  <!-- Connected figures -->
+  <circle cx="12" cy="9" r="1.5" fill="#F7F2E6" />
+  <circle cx="20" cy="9" r="1.5" fill="#E7B957" />
+  <!-- Connection node -->
+  <circle cx="16" cy="13" r="1.8" fill="#F7F2E6" />
+</svg>
