@@ -4,7 +4,12 @@ MEETUP Pulse is a location-aware social activity platform designed to help peopl
 
 Project requirements
 
-The complete requirements are documented in ""MEETUP_Pulse_PRD.md"" (MEETUP_Pulse_PRD.md).
+The complete requirements are documented in [MEETUP_Pulse_PRD.md](MEETUP_Pulse_PRD.md).
+
+API contract
+
+The baseline API contract draft is documented in [docs/API_CONTRACT.md](docs/API_CONTRACT.md).
+
 
 Development team
 
