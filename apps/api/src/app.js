@@ -120,7 +120,8 @@ function resolveAllowedOrigins(clientOrigin, nodeEnv = env.NODE_ENV) {
   return configured.length > 0 ? configured : ['http://localhost:5173'];
 }
 
-function createApp({ authMiddleware, optionalAuthMiddleware, sessionStore, corsOrigin } = {}) {
+function createApp(options = {}) {
+  const { authMiddleware, optionalAuthMiddleware, sessionStore, corsOrigin } = options;
   const app = express();
 
   // Trust proxy in production
@@ -198,21 +199,35 @@ function createApp({ authMiddleware, optionalAuthMiddleware, sessionStore, corsO
     app.use(generalLimiter);
   }
 
-  // Test-only endpoints to verify session cookie issuance and persistence
-  app.post('/api/test/session', (req, res) => {
-    req.session.userId = req.body?.userId || 'test-user-id';
+  // Baseline health check endpoint
+  app.get('/api/health', (req, res) => {
     res.status(200).json({
       success: true,
-      data: { initialized: true, userId: req.session.userId }
+      data: {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        environment: env.NODE_ENV
+      }
     });
   });
 
-  app.get('/api/test/session', (req, res) => {
-    res.status(200).json({
-      success: true,
-      data: { userId: req.session?.userId || null }
+  // Test-only endpoints to verify session cookie issuance and persistence
+  if (isTestMode || env.NODE_ENV === 'test') {
+    app.post('/api/test/session', (req, res) => {
+      req.session.userId = req.body?.userId || 'test-user-id';
+      res.status(200).json({
+        success: true,
+        data: { initialized: true, userId: req.session.userId }
+      });
     });
-  });
+
+    app.get('/api/test/session', (req, res) => {
+      res.status(200).json({
+        success: true,
+        data: { userId: req.session?.userId || null }
+      });
+    });
+  }
 
   // Hydrate req.user from session
   app.use(attachSessionUser);
@@ -224,45 +239,45 @@ function createApp({ authMiddleware, optionalAuthMiddleware, sessionStore, corsO
   app.use(
     '/api/auth',
     typeof authRoutes.createAuthRouter === 'function'
-      ? authRoutes.createAuthRouter({ authMiddleware })
+      ? authRoutes.createAuthRouter(options)
       : authRoutes
   );
 
   // Core Marketplace and Activity / Contest routes (Person 2)
-  const activityRouter = createActivityRouter({ authMiddleware, optionalAuthMiddleware });
+  const activityRouter = createActivityRouter(options);
   app.use('/api/activities', activityRouter);
   app.use('/api/contests', activityRouter);
   app.use(
     '/api/join-requests',
-    createJoinRequestRouter({ authMiddleware })
+    createJoinRequestRouter(options)
   );
   app.use(
     '/api/interest-requests',
-    createInterestRequestRouter({ authMiddleware })
+    createInterestRequestRouter(options)
   );
   app.use(
     '/api/proposals',
-    createProposalRouter({ authMiddleware })
+    createProposalRouter(options)
   );
   app.use(
     '/api/me/plans',
-    createPlansRouter({ authMiddleware })
+    createPlansRouter(options)
   );
   app.use(
     '/api/me',
-    createProfileRouter({ authMiddleware })
+    createProfileRouter(options)
   );
   app.use(
     '/api/notifications',
-    createNotificationRouter({ authMiddleware })
+    createNotificationRouter(options)
   );
   app.use(
     '/api/reports',
-    createReportRouter({ authMiddleware })
+    createReportRouter(options)
   );
   app.use(
     '/api/blocks',
-    createBlockRouter({ authMiddleware })
+    createBlockRouter(options)
   );
 
   // User routes (Person 3)
@@ -272,7 +287,7 @@ function createApp({ authMiddleware, optionalAuthMiddleware, sessionStore, corsO
   app.use(
     '/api/ai',
     typeof aiRoutes.createAiRouter === 'function'
-      ? aiRoutes.createAiRouter({ authMiddleware })
+      ? aiRoutes.createAiRouter(options)
       : aiRoutes
   );
 
@@ -290,6 +305,7 @@ const app = createApp();
 module.exports = app;
 module.exports.createApp = createApp;
 module.exports.app = app;
+module.exports.default = app;
 module.exports.resolveAllowedOrigins = resolveAllowedOrigins;
 module.exports.createCorsOriginValidator = createCorsOriginValidator;
 module.exports.isAllowedLocalDevOrigin = isAllowedLocalDevOrigin;

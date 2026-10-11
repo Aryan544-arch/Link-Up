@@ -37,7 +37,6 @@ function errorHandler(err, req, res, next) {
       }
     });
   }
-
   // Handle invalid/malformed JSON in request bodies
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     return res.status(400).json({
@@ -49,8 +48,12 @@ function errorHandler(err, req, res, next) {
     });
   }
 
-  // Handle explicit status codes on error object
-  const statusCode = err.statusCode || err.status || 500;
+  // Handle explicit status codes on error object (support both Express `status` and project `statusCode`)
+  const statusCode = typeof err.statusCode === 'number'
+    ? err.statusCode
+    : typeof err.status === 'number'
+      ? err.status
+      : 500;
   const isServerFault = statusCode >= 500;
   const errorCode = err.code || (isServerFault ? 'INTERNAL_SERVER_ERROR' : 'ERROR');
 
