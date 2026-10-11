@@ -31,8 +31,12 @@ function errorHandler(err, req, res, next) {
     });
   }
 
-  // Handle explicit status codes on error object
-  const statusCode = typeof err.status === 'number' ? err.status : 500;
+  // Handle explicit status codes on error object (support both Express `status` and project `statusCode`)
+  const statusCode = typeof err.statusCode === 'number'
+    ? err.statusCode
+    : typeof err.status === 'number'
+      ? err.status
+      : 500;
   const errorCode = err.code || (statusCode === 500 ? 'INTERNAL_ERROR' : 'ERROR');
 
   const errorResponse = {
