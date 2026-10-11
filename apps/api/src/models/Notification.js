@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
+const {
+  NOTIFICATION_TYPES: P2_NOTIFICATION_TYPES,
+  RELATED_RESOURCE_TYPES: P2_RESOURCE_TYPES
+} = require('../constants/notification.constants');
 
-const NOTIFICATION_TYPES = [
+const P3_NOTIFICATION_TYPES = [
   'join_request_received',
   'request_approved',
   'request_rejected',
@@ -11,13 +15,22 @@ const NOTIFICATION_TYPES = [
   'general'
 ];
 
-const RESOURCE_TYPES = [
+const COMBINED_NOTIFICATION_TYPES = Array.from(
+  new Set([...P2_NOTIFICATION_TYPES, ...P3_NOTIFICATION_TYPES])
+);
+
+const P3_RESOURCE_TYPES = [
   'activity',
   'join_request',
   'interest_request',
   'proposal',
-  'user'
+  'user',
+  'none'
 ];
+
+const COMBINED_RESOURCE_TYPES = Array.from(
+  new Set([...P2_RESOURCE_TYPES, ...P3_RESOURCE_TYPES])
+);
 
 const notificationSchema = new mongoose.Schema(
   {
@@ -31,7 +44,7 @@ const notificationSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Notification type is required'],
       enum: {
-        values: NOTIFICATION_TYPES,
+        values: COMBINED_NOTIFICATION_TYPES,
         message: 'Invalid notification type: {VALUE}'
       }
     },
@@ -40,22 +53,22 @@ const notificationSchema = new mongoose.Schema(
       required: [true, 'Notification title is required'],
       trim: true,
       minlength: [1, 'Title cannot be empty'],
-      maxlength: [100, 'Title cannot exceed 100 characters']
+      maxlength: [150, 'Title cannot exceed 150 characters']
     },
     message: {
       type: String,
       required: [true, 'Notification message is required'],
       trim: true,
       minlength: [1, 'Message cannot be empty'],
-      maxlength: [500, 'Message cannot exceed 500 characters']
+      maxlength: [1000, 'Message cannot exceed 1000 characters']
     },
     relatedResourceType: {
       type: String,
       enum: {
-        values: [...RESOURCE_TYPES, null],
+        values: [...COMBINED_RESOURCE_TYPES, null],
         message: 'Invalid related resource type: {VALUE}'
       },
-      default: null
+      default: 'none'
     },
     relatedResourceId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -63,22 +76,29 @@ const notificationSchema = new mongoose.Schema(
     },
     readAt: {
       type: Date,
-      default: null
+      default: null,
+      index: true
     },
     deduplicationKey: {
       type: String,
       sparse: true,
       unique: true
+    },
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null
     }
   },
   {
-    timestamps: true
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
   }
 );
 
 // Compound indexes for optimal queries
 notificationSchema.index({ recipientId: 1, createdAt: -1 });
-notificationSchema.index({ recipientId: 1, readAt: 1 });
+notificationSchema.index({ recipientId: 1, readAt: 1, createdAt: -1 });
 
 // Method to format a client-safe public JSON representation
 notificationSchema.methods.toPublicJSON = function () {
@@ -97,20 +117,9 @@ notificationSchema.methods.toPublicJSON = function () {
   };
 };
 
-notificationSchema.set('toJSON', {
-  transform: (doc, ret) => {
-    ret.id = ret._id.toString();
-    ret.recipientId = ret.recipientId.toString();
-    ret.isRead = Boolean(ret.readAt);
-    delete ret._id;
-    delete ret.__v;
-    delete ret.deduplicationKey;
-    return ret;
-  }
-});
-
-const Notification = mongoose.model('Notification', notificationSchema);
+const Notification =
+  mongoose.models.Notification || mongoose.model('Notification', notificationSchema);
 
 module.exports = Notification;
-module.exports.NOTIFICATION_TYPES = NOTIFICATION_TYPES;
-module.exports.RESOURCE_TYPES = RESOURCE_TYPES;
+module.exports.NOTIFICATION_TYPES = COMBINED_NOTIFICATION_TYPES;
+module.exports.RESOURCE_TYPES = COMBINED_RESOURCE_TYPES;

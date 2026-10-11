@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { createActivity, publishActivity } from '../../lib/activityApi';
+import { planActivity } from '../../lib/aiApi';
 import { normalizeApiError } from '../../lib/api';
 import FormInput from '../../components/common/FormInput';
 import AlertBanner from '../../components/common/AlertBanner';
@@ -38,6 +39,23 @@ const CATEGORIES = [
   'General Meetup',
 ];
 
+const BACKEND_TO_FRONTEND_CATEGORY = {
+  outdoor: 'Outdoor & Sports',
+  fitness: 'Fitness',
+  social: 'Social & Board Games',
+  arts: 'Creative & Crafts',
+  nature: 'Outdoor & Sports',
+  wellness: 'Fitness',
+  other: 'General Meetup'
+};
+
+const BACKEND_TO_FRONTEND_SKILL = {
+  'all-levels': 'All skill levels welcome',
+  'beginner': 'Beginner friendly',
+  'intermediate': 'Intermediate',
+  'advanced': 'Advanced / Experienced'
+};
+
 const DURATIONS = [
   '30 minutes',
   '1 hour',
@@ -54,6 +72,16 @@ const SKILL_LEVELS = [
   'Intermediate',
   'Advanced / Experienced',
 ];
+
+function minutesToDurationString(mins) {
+  if (mins <= 30) return '30 minutes';
+  if (mins <= 60) return '1 hour';
+  if (mins <= 90) return '1.5 hours';
+  if (mins <= 120) return '2 hours';
+  if (mins <= 150) return '2.5 hours';
+  if (mins <= 180) return '3 hours';
+  return 'Half day (4+ hours)';
+}
 
 function calculateEndsAt(startDate, durationStr) {
   let minutes = 90; // default 1.5 hours
@@ -105,6 +133,65 @@ export default function CreateActivityPage() {
   const [draftActivity, setDraftActivity] = useState(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishError, setPublishError] = useState(null);
+
+  // AI Planning Assistant State (Section 9 AI Integration)
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLocationHint, setAiLocationHint] = useState('');
+  const [isGeneratingAiPlan, setIsGeneratingAiPlan] = useState(false);
+  const [aiPlanNotice, setAiPlanNotice] = useState(null);
+
+  const handleGenerateAiPlan = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const promptToUse = aiPrompt.trim() || formData.title.trim();
+    if (!promptToUse || promptToUse.length < 3) {
+      setAiPlanNotice({
+        type: 'error',
+        message: 'Please provide a brief idea or prompt (at least 3 characters) to generate an AI draft.'
+      });
+      return;
+    }
+
+    setIsGeneratingAiPlan(true);
+    setAiPlanNotice(null);
+
+    try {
+      const plan = await planActivity({
+        prompt: promptToUse,
+        category: formData.category,
+        locationHint: aiLocationHint.trim() || formData.displayArea.trim() || undefined,
+        targetGroupSize: formData.capacity ? Number(formData.capacity) : undefined
+      });
+
+      if (plan) {
+        setFormData((prev) => ({
+          ...prev,
+          title: plan.title || prev.title,
+          description: plan.description || prev.description,
+          category: BACKEND_TO_FRONTEND_CATEGORY[plan.category] || prev.category,
+          capacity: plan.capacity || plan.suggestedCapacity || prev.capacity,
+          skillLevel: BACKEND_TO_FRONTEND_SKILL[plan.skillLevel] || prev.skillLevel,
+          duration: plan.suggestedDurationMinutes ? minutesToDurationString(plan.suggestedDurationMinutes) : prev.duration,
+          displayArea: plan.displayArea || plan.suggestedDisplayArea || prev.displayArea,
+          rules: Array.isArray(plan.checklist || plan.suggestedRules) && (plan.checklist || plan.suggestedRules).length > 0
+            ? (plan.checklist || plan.suggestedRules).join('\n')
+            : prev.rules
+        }));
+
+        setAiPlanNotice({
+          type: 'success',
+          message: `AI suggestions applied for "${plan.title}"! All fields are fully editable below. Review, choose date/time, and acquire location coordinates before saving your draft. (AI drafts are never automatically published.)`
+        });
+      }
+    } catch (err) {
+      const normalized = err.normalized || normalizeApiError(err);
+      setAiPlanNotice({
+        type: 'error',
+        message: normalized.message || 'Unable to generate AI plan draft. You can still fill out the form manually.'
+      });
+    } finally {
+      setIsGeneratingAiPlan(false);
+    }
+  };
 
   // Field change handler
   const handleChange = (e) => {
@@ -554,6 +641,86 @@ export default function CreateActivityPage() {
               />
             </div>
           )}
+
+          {/* AI Planning Assistant Card */}
+          <section
+            className="ai-planning-card"
+            style={{
+              padding: 'var(--space-4)',
+              borderRadius: 'var(--radius-lg, 12px)',
+              backgroundColor: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              marginBottom: 'var(--space-6)'
+            }}
+            aria-label="AI Planning Assistant"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
+              <div style={{ color: '#16a34a', display: 'flex' }}>
+                <Sparkles size={20} aria-hidden="true" />
+              </div>
+              <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#15803d', margin: 0 }}>
+                AI Planning Assistant
+              </h2>
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                  backgroundColor: '#dcfce7',
+                  color: '#166534',
+                  fontWeight: 500
+                }}
+              >
+                Safe Draft Only
+              </span>
+            </div>
+
+            <p style={{ fontSize: '0.875rem', color: '#166534', margin: '0 0 var(--space-3)' }}>
+              Enter an activity idea to generate a structured draft outline. Suggestions populate the form as an editable draft—you review everything before publishing.
+            </p>
+
+            <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center' }}>
+              <input
+                type="text"
+                className="form-control"
+                style={{ flex: '1 1 240px', minWidth: '200px', backgroundColor: '#ffffff' }}
+                placeholder="e.g. Sunset Spikeball scrimmage in the park"
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                disabled={isGeneratingAiPlan || isSubmitting}
+                aria-label="AI activity prompt"
+              />
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleGenerateAiPlan}
+                disabled={isGeneratingAiPlan || isSubmitting}
+                style={{ backgroundColor: '#16a34a', borderColor: '#16a34a' }}
+              >
+                {isGeneratingAiPlan ? (
+                  <>
+                    <RefreshCw size={15} aria-hidden="true" />
+                    <span>Generating Draft...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={15} aria-hidden="true" />
+                    <span>Generate Plan Draft</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {aiPlanNotice && (
+              <div style={{ marginTop: 'var(--space-3)' }}>
+                <AlertBanner
+                  type={aiPlanNotice.type}
+                  title={aiPlanNotice.type === 'success' ? 'AI Draft Applied' : 'AI Assistant Notice'}
+                  message={aiPlanNotice.message}
+                />
+              </div>
+            )}
+          </section>
 
           {/* Activity Creation Form */}
           <form onSubmit={handleSubmit} noValidate>

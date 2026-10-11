@@ -30,16 +30,42 @@ const updateProfileSchema = z.object({
     .optional()
 });
 
-const updatePreferencesSchema = z.object({
-  interests: z
-    .array(
-      z.enum(ACTIVITY_CATEGORIES, {
-        errorMap: () => ({
-          message: `Interest must be one of: ${ACTIVITY_CATEGORIES.join(', ')}`
-        })
+const CATEGORY_ALIASES = {
+  'outdoor & sports': 'outdoor',
+  'study & focus': 'other',
+  'fitness': 'fitness',
+  'social & board games': 'social',
+  'creative & crafts': 'arts',
+  'food & coffee': 'social',
+  'music & jamming': 'arts',
+  'hiking & nature': 'nature',
+  'tech & hackathons': 'other',
+  'photography': 'arts',
+  'languages & culture': 'social',
+  'volunteering': 'social',
+  'general meetup': 'other'
+};
+
+const interestSchema = z
+  .string()
+  .trim()
+  .transform((val) => CATEGORY_ALIASES[val.toLowerCase()] || val.toLowerCase())
+  .pipe(
+    z.enum(ACTIVITY_CATEGORIES, {
+      errorMap: () => ({
+        message: `Interest must be one of: ${ACTIVITY_CATEGORIES.join(', ')}`
       })
-    )
+    })
+  );
+
+const updatePreferencesSchema = z.object({
+  interests: z.array(interestSchema).optional(),
+  preferredArea: z
+    .string()
+    .trim()
+    .max(200, { message: 'Display area cannot exceed 200 characters' })
     .optional(),
+  onboardingCompleted: z.boolean().optional(),
   searchRadiusKm: z
     .number({ invalid_type_error: 'searchRadiusKm must be a number' })
     .int({ message: 'searchRadiusKm must be an integer' })

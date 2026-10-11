@@ -68,14 +68,8 @@ async function attachSessionUser(req, res, next) {
       const User = require('../models/User');
       const user = await User.findById(req.session.userId).exec();
       if (user) {
-        req.user = {
-          id: user._id.toString(),
-          _id: user._id,
-          email: user.email,
-          displayName: user.displayName,
-          bio: user.bio,
-          avatar: user.avatar
-        };
+        req.user = user;
+        req.user.id = user._id.toString();
       } else {
         delete req.session.userId;
       }

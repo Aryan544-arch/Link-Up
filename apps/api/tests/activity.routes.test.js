@@ -413,3 +413,67 @@ test('Protected routes reject req.user missing both id and _id with 401 UNAUTHOR
   assert.equal(res.body.success, false);
   assert.equal(res.body.error.code, 'UNAUTHORIZED');
 });
+
+test('POST /api/activities accepts category/skill aliases, string budget, and rules array', async () => {
+  const originalSave = Activity.prototype.save;
+  Activity.prototype.save = async function () {
+    return this;
+  };
+
+  const payload = {
+    title: 'Frisbee in the Park',
+    description: 'Casual ultimate frisbee scrimmage for all skill levels.',
+    category: 'Outdoor & Sports',
+    skillLevel: 'All skill levels welcome',
+    startsAt: new Date(Date.now() + 3600000).toISOString(),
+    endsAt: new Date(Date.now() + 7200000).toISOString(),
+    location: { type: 'Point', coordinates: [-73.968, 40.785] },
+    displayArea: 'Central Park Great Lawn',
+    budget: 'Free',
+    capacity: 12,
+    rules: ['Bring water', 'Wear running shoes']
+  };
+
+  const res = await request(organizerApp)
+    .post('/api/activities')
+    .send(payload)
+    .expect(201);
+
+  assert.equal(res.body.success, true);
+  assert.equal(res.body.data.category, 'outdoor');
+  assert.equal(res.body.data.skillLevel, 'all-levels');
+  assert.equal(res.body.data.budget, 0);
+
+  Activity.prototype.save = originalSave;
+});
+
+test('GET /api/activities accepts category alias and skill level alias in search query', async () => {
+  const originalFind = Activity.find;
+  const originalCount = Activity.countDocuments;
+  const sampleDoc = getMockActivityDoc({ status: 'published' });
+
+  Activity.find = () => ({
+    sort: () => ({
+      skip: () => ({
+        limit: () => ({
+          exec: async () => [sampleDoc]
+        })
+      })
+    })
+  });
+
+  Activity.countDocuments = () => ({
+    exec: async () => 1
+  });
+
+  const res = await request(unauthApp)
+    .get('/api/activities')
+    .query({ category: 'Outdoor & Sports', skillLevel: 'Beginner friendly' })
+    .expect(200);
+
+  assert.equal(res.body.success, true);
+  assert.equal(res.body.data.activities.length, 1);
+
+  Activity.find = originalFind;
+  Activity.countDocuments = originalCount;
+});

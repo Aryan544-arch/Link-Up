@@ -96,6 +96,12 @@ async function updatePreferences(userId, updateData) {
 
   if (updateData.preferredLocation !== undefined) {
     user.preferredLocation = updateData.preferredLocation;
+  } else if (updateData.preferredArea !== undefined) {
+    const currentCoords = user.preferredLocation?.coordinates || null;
+    user.preferredLocation = {
+      displayArea: updateData.preferredArea,
+      coordinates: currentCoords
+    };
   }
 
   if (updateData.notificationPreferences !== undefined) {

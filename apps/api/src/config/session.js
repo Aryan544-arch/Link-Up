@@ -1,5 +1,6 @@
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
+const connectMongo = require('connect-mongo');
+const MongoStore = connectMongo.MongoStore || connectMongo.default || connectMongo;
 const env = require('./env');
 
 let sessionStore = null;

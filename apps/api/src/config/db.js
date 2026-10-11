@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const env = require('./env');
 
 const connectionStates = {
   0: 'disconnected',
@@ -17,8 +18,10 @@ function getDatabaseStatus() {
   };
 }
 
-async function connectDatabase(uri) {
-  if (mongoose.connection.readyState === 1) {
+let isConnected = false;
+
+async function connectDatabase(uri = env.MONGODB_URI) {
+  if (isConnected || mongoose.connection.readyState === 1) {
     return mongoose.connection;
   }
 
@@ -35,35 +38,6 @@ async function connectDatabase(uri) {
     console.log('[Database] MongoDB disconnected');
   });
 
-  await mongoose.connect(uri, {
-    serverSelectionTimeoutMS: 5000
-  });
-
-  return mongoose.connection;
-}
-
-async function disconnectDatabase() {
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.disconnect();
-  }
-}
-
-module.exports = {
-  connectDatabase,
-  disconnectDatabase,
-  getDatabaseStatus,
-  connectionStates
-};
-const mongoose = require('mongoose');
-const env = require('./env');
-
-let isConnected = false;
-
-async function connectDB(uri = env.MONGODB_URI) {
-  if (isConnected || mongoose.connection.readyState === 1) {
-    return mongoose.connection;
-  }
-
   const conn = await mongoose.connect(uri, {
     serverSelectionTimeoutMS: 5000
   });
@@ -72,11 +46,18 @@ async function connectDB(uri = env.MONGODB_URI) {
   return conn;
 }
 
-async function disconnectDB() {
+async function disconnectDatabase() {
   if (mongoose.connection.readyState !== 0) {
     await mongoose.disconnect();
     isConnected = false;
   }
 }
 
-module.exports = { connectDB, disconnectDB };
+module.exports = {
+  connectDatabase,
+  disconnectDatabase,
+  connectDB: connectDatabase,
+  disconnectDB: disconnectDatabase,
+  getDatabaseStatus,
+  connectionStates
+};

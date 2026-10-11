@@ -18,16 +18,26 @@ describe('MEETUP Pulse — Persistent In-App Notifications', () => {
     await User.syncIndexes();
   });
 
-  after(async () => {
+  async function cleanupTestData() {
+    const testUsers = await User.find({ email: { $regex: /@notif-test\.example\.com$/i } }).select('_id');
+    const userIds = testUsers.map((u) => u._id);
+    await Notification.deleteMany({
+      $or: [
+        { recipientId: { $in: userIds } },
+        { deduplicationKey: { $regex: /^(race-|dup-)/ } }
+      ]
+    });
     await User.deleteMany({ email: { $regex: /@notif-test\.example\.com$/i } });
-    await Notification.deleteMany({});
+  }
+
+  after(async () => {
+    await cleanupTestData();
     await closeSessionStore();
     await disconnectDB();
   });
 
   beforeEach(async () => {
-    await User.deleteMany({ email: { $regex: /@notif-test\.example\.com$/i } });
-    await Notification.deleteMany({});
+    await cleanupTestData();
   });
 
   // Helper to create and log in a user, returning { user, cookie }

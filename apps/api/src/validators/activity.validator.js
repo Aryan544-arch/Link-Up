@@ -32,6 +32,94 @@ const locationSchema = z.strictObject({
   coordinates: geoJsonCoordinatesSchema
 });
 
+const CATEGORY_ALIASES = {
+  'outdoor & sports': 'outdoor',
+  'study & focus': 'other',
+  'fitness': 'fitness',
+  'social & board games': 'social',
+  'creative & crafts': 'arts',
+  'food & coffee': 'social',
+  'music & jamming': 'arts',
+  'hiking & nature': 'nature',
+  'general meetup': 'other'
+};
+
+const SKILL_LEVEL_ALIASES = {
+  'all': 'all-levels',
+  'all skill levels welcome': 'all-levels',
+  'all-levels': 'all-levels',
+  'beginner friendly': 'beginner',
+  'beginner': 'beginner',
+  'intermediate': 'intermediate',
+  'advanced / experienced': 'advanced',
+  'advanced': 'advanced'
+};
+
+const categoryFieldSchema = z
+  .string({ required_error: 'Category is required' })
+  .trim()
+  .transform((val) => CATEGORY_ALIASES[val.toLowerCase()] || val.toLowerCase())
+  .pipe(
+    z.enum(ACTIVITY_CATEGORIES, {
+      errorMap: () => ({
+        message: `Category must be one of: ${ACTIVITY_CATEGORIES.join(', ')}`
+      })
+    })
+  );
+
+const optionalCategoryFieldSchema = z
+  .string()
+  .trim()
+  .transform((val) => CATEGORY_ALIASES[val.toLowerCase()] || val.toLowerCase())
+  .pipe(
+    z.enum(ACTIVITY_CATEGORIES, {
+      errorMap: () => ({
+        message: `Category must be one of: ${ACTIVITY_CATEGORIES.join(', ')}`
+      })
+    })
+  )
+  .optional();
+
+const skillLevelFieldSchema = z
+  .string()
+  .trim()
+  .transform((val) => SKILL_LEVEL_ALIASES[val.toLowerCase()] || val.toLowerCase())
+  .pipe(
+    z.enum(SKILL_LEVELS, {
+      errorMap: () => ({
+        message: `Skill level must be one of: ${SKILL_LEVELS.join(', ')}`
+      })
+    })
+  )
+  .default('all-levels');
+
+const optionalSkillLevelFieldSchema = z
+  .string()
+  .trim()
+  .transform((val) => SKILL_LEVEL_ALIASES[val.toLowerCase()] || val.toLowerCase())
+  .pipe(
+    z.enum(SKILL_LEVELS, {
+      errorMap: () => ({
+        message: `Skill level must be one of: ${SKILL_LEVELS.join(', ')}`
+      })
+    })
+  )
+  .optional();
+
+const budgetFieldSchema = z
+  .union([z.number(), z.string()])
+  .transform((val) => {
+    if (typeof val === 'number') return val;
+    const str = String(val).trim().toLowerCase();
+    if (str === 'free' || str === '') return 0;
+    const num = parseFloat(str.replace(/[^0-9.]/g, ''));
+    return isNaN(num) ? NaN : num;
+  })
+  .pipe(
+    z.number({ invalid_type_error: 'Budget must be a number' }).min(0, 'Budget cannot be negative')
+  )
+  .default(0);
+
 // Schema for creating an Activity (Protected fields forbidden)
 const createActivitySchema = z
   .strictObject({
@@ -45,11 +133,7 @@ const createActivitySchema = z
       .trim()
       .min(10, 'Description must be at least 10 characters')
       .max(2000, 'Description cannot exceed 2000 characters'),
-    category: z.enum(ACTIVITY_CATEGORIES, {
-      errorMap: () => ({
-        message: `Category must be one of: ${ACTIVITY_CATEGORIES.join(', ')}`
-      })
-    }),
+    category: categoryFieldSchema,
     startsAt: z.coerce.date({
       required_error: 'Start time is required',
       invalid_type_error: 'Invalid start time date format'
@@ -64,23 +148,15 @@ const createActivitySchema = z
       .trim()
       .min(2, 'Display area must be at least 2 characters')
       .max(200, 'Display area cannot exceed 200 characters'),
-    budget: z.coerce
-      .number()
-      .min(0, 'Budget cannot be negative')
-      .default(0),
-    skillLevel: z
-      .enum(SKILL_LEVELS, {
-        errorMap: () => ({
-          message: `Skill level must be one of: ${SKILL_LEVELS.join(', ')}`
-        })
-      })
-      .default('all-levels'),
+    budget: budgetFieldSchema,
+    skillLevel: skillLevelFieldSchema,
     capacity: z.coerce
       .number({ required_error: 'Capacity is required' })
       .int('Capacity must be an integer')
       .min(1, 'Capacity must be at least 1')
       .max(1000, 'Capacity cannot exceed 1000'),
-    approvalRequired: z.boolean().default(true)
+    approvalRequired: z.boolean().default(true),
+    rules: z.array(z.string()).optional()
   })
   .refine(
     (data) => new Date(data.endsAt).getTime() > new Date(data.startsAt).getTime(),
@@ -105,7 +181,7 @@ const updateActivitySchema = z
       .min(10, 'Description must be at least 10 characters')
       .max(2000, 'Description cannot exceed 2000 characters')
       .optional(),
-    category: z.enum(ACTIVITY_CATEGORIES).optional(),
+    category: optionalCategoryFieldSchema,
     startsAt: z.coerce.date().optional(),
     endsAt: z.coerce.date().optional(),
     location: locationSchema.optional(),
@@ -115,15 +191,16 @@ const updateActivitySchema = z
       .min(2, 'Display area must be at least 2 characters')
       .max(200, 'Display area cannot exceed 200 characters')
       .optional(),
-    budget: z.coerce.number().min(0, 'Budget cannot be negative').optional(),
-    skillLevel: z.enum(SKILL_LEVELS).optional(),
+    budget: budgetFieldSchema.optional(),
+    skillLevel: optionalSkillLevelFieldSchema,
     capacity: z.coerce
       .number()
       .int('Capacity must be an integer')
       .min(1, 'Capacity must be at least 1')
       .max(1000, 'Capacity cannot exceed 1000')
       .optional(),
-    approvalRequired: z.boolean().optional()
+    approvalRequired: z.boolean().optional(),
+    rules: z.array(z.string()).optional()
   })
   .refine(
     (data) => {
@@ -162,8 +239,8 @@ const activitySearchQuerySchema = z
       .positive('Radius must be a positive number')
       .max(100, 'Radius cannot exceed 100 km')
       .default(DEFAULT_RADIUS_KM),
-    category: z.enum(ACTIVITY_CATEGORIES).optional(),
-    skillLevel: z.enum(SKILL_LEVELS).optional(),
+    category: optionalCategoryFieldSchema,
+    skillLevel: optionalSkillLevelFieldSchema,
     maxBudget: z.coerce
       .number()
       .min(0, 'Maximum budget cannot be negative')

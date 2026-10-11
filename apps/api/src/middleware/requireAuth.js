@@ -17,7 +17,8 @@ async function requireAuth(req, res, next) {
   }
 
   try {
-    const user = await User.findById(req.session.userId);
+    const query = User.findById(req.session.userId);
+    const user = query && typeof query.exec === 'function' ? await query.exec() : await query;
 
     if (!user) {
       // Session references a deleted or invalid user

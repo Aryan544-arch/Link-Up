@@ -1,6 +1,7 @@
 const express = require('express');
 const { getDatabaseStatus } = require('../config/db');
 const { apiSuccess } = require('../utils/apiResponse');
+const env = require('../config/env');
 
 const router = express.Router();
 
@@ -11,6 +12,7 @@ router.get('/health', (req, res) => {
   const healthData = {
     status: isDbConnected ? 'ok' : 'degraded',
     service: 'meetup-pulse-api',
+    environment: env.NODE_ENV,
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),
     database: {

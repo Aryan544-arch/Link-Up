@@ -14,6 +14,7 @@ function createNotificationRouter(options = {}) {
   const requireAuth = options.authMiddleware || defaultRequireAuth;
 
   router.get('/', requireAuth, notificationController.getNotifications);
+  router.get('/unread-count', requireAuth, notificationController.getUnreadCount);
   router.patch('/read-all', requireAuth, notificationController.markAllRead);
   router.patch('/:id/read', requireAuth, notificationController.markRead);
 

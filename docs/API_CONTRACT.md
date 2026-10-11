@@ -1439,3 +1439,85 @@ Discovery (city/area radius) -> Details (privacy-masked) -> Request to Join -> O
 - **P0 Core (Must Ship):** Session auth, draft/published activity lifecycle, 3 km default radius discovery, join requests, atomic capacity protection, deterministic matching (Phase 5), and My Plans.
 - **P1 / Stretch (Do Not Block P0):** Web Push, email verification links, BullMQ/Redis background workers, Socket.IO live chat, and AI planning assistants must not hold up core activity flows.
 
+---
+
+## 9. AI Planning Foundation (`/api/ai`)
+Owner: Person 3 (Authentication and AI)
+
+### Invariants & Safety Rules (PRD §11 & §17)
+1. **Zero-Credential Availability:** The application must remain 100% functional when `AI_PROVIDER_API_KEY` is undefined. The service transparently provides deterministic templates matching all categories.
+2. **Draft-Only Suggestions:** Output is strictly a suggested blueprint (title, description, checklist, safety tips, duration). The AI foundation **never** automatically creates, publishes, or confirms activity attendance.
+3. **No Unhandled Failures:** External LLM timeouts or network faults immediately fall back to the deterministic template with `source: "fallback"` and HTTP 200.
+
+### 9.1 `GET /api/ai/status`
+- **Status:** **Implemented** (Verified)
+- **Auth:** Public
+- **Description:** Checks whether AI provider integration is active or running in deterministic fallback mode.
+- **Success Response (`200 OK`):**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "enabled": false,
+      "model": "gemini-1.5-flash",
+      "provider": "deterministic-fallback"
+    }
+  }
+  ```
+
+### 9.2 `POST /api/ai/plan-activity`
+- **Status:** **Implemented** (Verified)
+- **Auth:** Required (`requireAuth`)
+- **Description:** Generates a structured activity blueprint based on user input, category, skill level, and location.
+- **Request Body:**
+  ```json
+  {
+    "category": "fitness",
+    "prompt": "Morning 5K loop for newcomers",
+    "displayArea": "Prospect Park, Brooklyn",
+    "skillLevel": "beginner",
+    "groupSize": 8,
+    "budget": 0
+  }
+  ```
+- **Field Constraints:**
+  - `category`: String, optional (default `'outdoor'`). Must be one of: `outdoor`, `sports`, `fitness`, `social`, `nature`, `gaming`, `wellness`, `arts`, `other`.
+  - `prompt`: String, optional (max 300 characters).
+  - `displayArea`: String, optional (max 200 characters).
+  - `skillLevel`: String, optional (default `'all-levels'`). Must be one of: `all-levels`, `beginner`, `intermediate`, `advanced`.
+  - `groupSize`: Integer, optional (min 2, max 50, default 6).
+  - `budget`: Number, optional (min 0, max 1000, default 0).
+- **Success Response (`200 OK`):**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "suggestion": {
+        "title": "Morning 5K Loop for Newcomers",
+        "description": "An energizing morning run through the park at a conversational pace, followed by cool-down stretching. Focus: Morning 5K loop for newcomers.",
+        "category": "fitness",
+        "skillLevel": "beginner",
+        "capacity": 8,
+        "budget": 0,
+        "suggestedDurationMinutes": 60,
+        "displayArea": "Prospect Park, Brooklyn",
+        "checklist": [
+          "Running shoes",
+          "Water bottle",
+          "Breathable athletic clothing",
+          "Optional watch/timer"
+        ],
+        "safetyTips": [
+          "Stick to designated pedestrian pathways",
+          "Warm up with a brisk walk before jogging",
+          "Stay hydrated"
+        ]
+      },
+      "source": "fallback",
+      "disclaimer": "This is a deterministic activity draft template. Review and edit all fields before saving or publishing."
+    }
+  }
+  ```
+- **Error Responses:**
+  - `400 VALIDATION_ERROR`: Unsupported category or out-of-bounds groupSize/budget.
+  - `401 UNAUTHORIZED`: Unauthenticated request (session cookie missing or invalid).

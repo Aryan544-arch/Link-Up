@@ -1,15 +1,23 @@
 const express = require('express');
 const { authLimiter } = require('../middleware/rateLimiter');
-const requireAuth = require('../middleware/requireAuth');
+const defaultRequireAuth = require('../middleware/requireAuth');
 const authController = require('../controllers/authController');
 
-const router = express.Router();
+function createAuthRouter({ authMiddleware = defaultRequireAuth } = {}) {
+  const router = express.Router();
 
-router.post('/register', authLimiter, authController.register);
-router.post('/login', authLimiter, authController.login);
-router.get('/verify-email', authController.verifyEmail);
-router.post('/verify-email', authController.verifyEmail);
-router.post('/logout', requireAuth, authController.logout);
-router.get('/me', requireAuth, authController.getCurrentUser);
+  router.post('/register', authLimiter, authController.register);
+  router.post('/login', authLimiter, authController.login);
+  router.get('/verify-email', authController.verifyEmail);
+  router.post('/verify-email', authController.verifyEmail);
+  router.post('/logout', authMiddleware, authController.logout);
+  router.get('/me', authMiddleware, authController.getCurrentUser);
 
-module.exports = router;
+  return router;
+}
+
+const defaultAuthRouter = createAuthRouter();
+defaultAuthRouter.createAuthRouter = createAuthRouter;
+
+module.exports = defaultAuthRouter;
+module.exports.createAuthRouter = createAuthRouter;

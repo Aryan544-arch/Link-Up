@@ -16,8 +16,7 @@ export async function registerRequest({ displayName, email, password }) {
   return apiClient.post('/api/auth/register', {
     displayName,
     email,
-    password,
-    termsAccepted: true,
+    password
   });
 }
 
