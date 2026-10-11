@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import AlertBanner from '../../components/common/AlertBanner';
 import { normalizeApiError } from '../../lib/api';
 import { updatePreferencesRequest } from '../../lib/authApi';
+import { isSecureContextSupported, POPULAR_AREAS } from '../../lib/locationUtils';
 import { 
   Compass, 
   MapPin, 
@@ -85,6 +86,15 @@ export default function OnboardingPage() {
 
   // Explicit browser geolocation trigger
   const requestBrowserLocation = () => {
+    if (!isSecureContextSupported()) {
+      setBrowserLocationStatus('denied');
+      setLocationMode('manual');
+      setStepError(
+        'Browser geolocation requires HTTPS or localhost. On LAN HTTP (e.g. 10.162.61.69), please select your neighborhood manually below or visit via http://localhost:5173.'
+      );
+      return;
+    }
+
     if (!navigator.geolocation) {
       setBrowserLocationStatus('denied');
       setLocationMode('manual');
@@ -365,6 +375,26 @@ export default function OnboardingPage() {
                         setStepError(null);
                       }}
                     />
+                    <div style={{ marginTop: 'var(--space-2)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
+                      <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginRight: 'var(--space-1)', alignSelf: 'center' }}>
+                        Suggestions:
+                      </span>
+                      {POPULAR_AREAS.slice(0, 5).map((area) => (
+                        <button
+                          key={area.name}
+                          type="button"
+                          className="btn btn-ghost btn-xs"
+                          style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '12px', border: '1px solid var(--border-color)' }}
+                          onClick={() => {
+                            setManualArea(area.displayArea);
+                            setLocationMode('manual');
+                            setStepError(null);
+                          }}
+                        >
+                          📍 {area.displayArea.split(',')[0]}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>

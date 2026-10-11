@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Activity = require('../models/Activity');
 const JoinRequest = require('../models/JoinRequest');
 const { DEFAULT_RADIUS_KM } = require('../constants/activity.constants');
@@ -21,9 +22,14 @@ function serializeActivity(activity, currentUserId = null) {
       doc.organizerId.toString() === currentUserId.toString()
   );
 
+  const base = {
+    ...doc,
+    isOrganizer: Boolean(isOrganizer)
+  };
+
   if (!isOrganizer) {
     return {
-      ...doc,
+      ...base,
       location: {
         type: doc.location?.type || 'Point',
         coordinates: null,
@@ -33,7 +39,7 @@ function serializeActivity(activity, currentUserId = null) {
   }
 
   return {
-    ...doc,
+    ...base,
     location: {
       ...doc.location,
       isPrecise: true
@@ -187,7 +193,31 @@ async function getActivityById(activityId, currentUserId = null) {
     throw err;
   }
 
-  return serializeActivity(activity, currentUserId);
+  const serialized = serializeActivity(activity, currentUserId);
+
+  if (currentUserId && mongoose.connection.readyState === 1) {
+    try {
+      const existingJoin = await JoinRequest.findOne({
+        activityId,
+        userId: currentUserId,
+        status: { $in: ['pending', 'approved', 'rejected'] }
+      }).sort({ createdAt: -1 }).lean().exec();
+
+      if (existingJoin) {
+        serialized.userParticipationStatus = existingJoin.status;
+        serialized.userJoinRequestId = existingJoin._id.toString();
+        serialized.userJoinRequest = {
+          id: existingJoin._id.toString(),
+          status: existingJoin.status,
+          note: existingJoin.note || null
+        };
+      }
+    } catch (_) {
+      // Graceful fallback if database query fails or is not available
+    }
+  }
+
+  return serialized;
 }
 
 /**

@@ -68,3 +68,23 @@ export async function logoutRequest() {
 export async function updatePreferencesRequest(preferences) {
   return apiClient.patch('/api/me/preferences', preferences);
 }
+
+/**
+ * Fetch current authenticated user session
+ * PRD Contract: GET /api/auth/me
+ * Status: Defined in PRD §4 Journey B & §11
+ */
+export async function getCurrentUserRequest() {
+  return apiClient.get('/api/auth/me');
+}
+
+/**
+ * Safely extracts user profile data from backend response envelope.
+ * Supports standard API envelope { success: true, data: user }, legacy { user }, or direct object.
+ */
+export function extractUserData(response) {
+  if (!response || typeof response !== 'object') return null;
+  const body = response.data || response;
+  if (!body || typeof body !== 'object') return null;
+  return body.data || body.user || body;
+}

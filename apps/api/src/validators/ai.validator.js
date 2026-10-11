@@ -93,7 +93,10 @@ const planActivitySchema = z.object({
     .min(0, 'budget must be non-negative')
     .max(1000, 'budget cannot exceed 1000')
     .optional()
-    .default(0)
+    .default(0),
+  durationMinutes: z.coerce.number().int().min(15).max(480).optional(),
+  time: z.string().trim().max(50).optional(),
+  date: z.string().trim().max(50).optional()
 });
 
 module.exports = {

@@ -37,3 +37,10 @@ test('loadEnv rejects negative or invalid PORT numbers', () => {
     /Environment validation failed: PORT/
   );
 });
+
+test('loadEnv validates and accepts comma-separated CLIENT_ORIGIN values', () => {
+  const env = loadEnv({
+    CLIENT_ORIGIN: 'http://localhost:5173,http://localhost:5175'
+  });
+  assert.equal(env.CLIENT_ORIGIN, 'http://localhost:5173,http://localhost:5175');
+});

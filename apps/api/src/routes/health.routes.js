@@ -17,7 +17,9 @@ router.get('/health', (req, res) => {
     uptimeSeconds: Math.floor(process.uptime()),
     database: {
       status: dbStatus.status,
-      readyState: dbStatus.readyState
+      readyState: dbStatus.readyState,
+      host: dbStatus.host || null,
+      name: dbStatus.name || null
     }
   };
 

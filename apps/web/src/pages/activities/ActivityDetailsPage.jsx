@@ -10,6 +10,7 @@ import {
 } from '../../lib/activityApi';
 import { normalizeApiError } from '../../lib/api';
 import AlertBanner from '../../components/common/AlertBanner';
+import { formatDisplayArea } from '../../lib/locationUtils';
 import {
   ArrowLeft,
   Calendar,
@@ -79,6 +80,7 @@ export default function ActivityDetailsPage() {
   const [userJoinRequestId, setUserJoinRequestId] = useState(null);
   const [joinNote, setJoinNote] = useState('');
   const [joinError, setJoinError] = useState(null);
+  const [joinSuccess, setJoinSuccess] = useState(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState(null);
 
@@ -158,6 +160,7 @@ export default function ActivityDetailsPage() {
 
     setJoinStatus('submitting');
     setJoinError(null);
+    setJoinSuccess(null);
 
     try {
       const response = await requestToJoinActivity(id, {
@@ -170,10 +173,22 @@ export default function ActivityDetailsPage() {
         setUserJoinRequestId(createdReqId);
       }
       setJoinStatus(serverStatus === 'approved' ? 'approved' : 'pending');
+      setJoinSuccess(
+        serverStatus === 'approved'
+          ? 'You have joined this activity!'
+          : 'Your join request was submitted successfully and is pending organizer review.'
+      );
+      loadActivity();
     } catch (err) {
       const normalized = err.normalized || normalizeApiError(err);
-      setJoinError(normalized);
-      setJoinStatus('idle');
+      if (err.response?.status === 409 || normalized?.code === 'DUPLICATE_JOIN_REQUEST') {
+        setJoinStatus('pending');
+        setJoinSuccess('You have already submitted a request for this activity. It is currently pending review.');
+        setJoinError(null);
+      } else {
+        setJoinError(normalized);
+        setJoinStatus('idle');
+      }
     }
   };
 
@@ -326,8 +341,8 @@ export default function ActivityDetailsPage() {
   const activityId = activity.id || _id || id;
   const organizerDisplay = organizer?.displayName || organizerName || 'LinkUp Organizer';
   const displayBudget = budget || cost || 'Free';
-  // Location Privacy: Always display displayArea or general area name
-  const generalLocation = displayArea || area || 'Location provided by organizer';
+  // Location Privacy: Always display human-readable displayArea or general area name
+  const generalLocation = formatDisplayArea(displayArea || area, activity.location?.coordinates);
   const badgeClass = getCategoryBadgeClass(category);
 
   // Compute spots information defensively
@@ -539,7 +554,13 @@ export default function ActivityDetailsPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                     {requests.map((req) => {
                       const reqId = req.id || req._id;
-                      const requesterName = req.user?.displayName || req.userName || req.displayName || 'Participant';
+                      const requesterName =
+                        req.userId?.displayName ||
+                        req.user?.displayName ||
+                        req.requester?.displayName ||
+                        req.userName ||
+                        req.displayName ||
+                        'Participant';
                       const isPending = req.status === 'pending';
                       const isDeciding = decisionLoadingId === reqId;
 
@@ -567,17 +588,24 @@ export default function ActivityDetailsPage() {
                                 "{req.note}"
                               </p>
                             )}
-                            <span
-                              className="badge"
-                              style={{
-                                fontSize: '11px',
-                                textTransform: 'capitalize',
-                                backgroundColor: req.status === 'approved' ? '#dcfce7' : req.status === 'rejected' ? '#fee2e2' : '#fef3c7',
-                                color: req.status === 'approved' ? '#166534' : req.status === 'rejected' ? '#991b1b' : '#92400e'
-                              }}
-                            >
-                              Status: {req.status}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: '4px' }}>
+                              <span
+                                className="badge"
+                                style={{
+                                  fontSize: '11px',
+                                  textTransform: 'capitalize',
+                                  backgroundColor: req.status === 'approved' ? '#dcfce7' : req.status === 'rejected' ? '#fee2e2' : '#fef3c7',
+                                  color: req.status === 'approved' ? '#166534' : req.status === 'rejected' ? '#991b1b' : '#92400e'
+                                }}
+                              >
+                                Status: {req.status}
+                              </span>
+                              {req.createdAt && (
+                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                  Submitted {formatActivityDateTime(req.createdAt)}
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           {isPending && (
@@ -647,6 +675,14 @@ export default function ActivityDetailsPage() {
               )}
 
               {/* Status & Error Feedback */}
+              {joinSuccess && (
+                <AlertBanner
+                  type="success"
+                  title="Request Update"
+                  message={joinSuccess}
+                />
+              )}
+
               {joinError && (
                 <AlertBanner
                   type="error"

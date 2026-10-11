@@ -36,10 +36,11 @@ function evaluateMatch(source, target) {
   const overlapHours = Math.max(0, overlapMs / 3600000);
 
   // Distance
-  const distanceKm = calculateDistanceKm(
-    source.location.coordinates,
-    target.location.coordinates
-  );
+  const sourceCoords = source.location?.coordinates;
+  const targetCoords = target.location?.coordinates;
+  const distanceKm = (sourceCoords && targetCoords)
+    ? calculateDistanceKm(sourceCoords, targetCoords)
+    : 0;
 
   const maxAllowedKm = (source.radiusKm || 3) + (target.radiusKm || 3);
 
@@ -137,10 +138,12 @@ async function findMatchesForRequest({ requestId, currentUserId }) {
     }
 
     // 2. Strict distance radius check
-    const distanceKm = calculateDistanceKm(
-      sourceRequest.location.coordinates,
-      candidate.location.coordinates
-    );
+    const sourceCoords = sourceRequest.location?.coordinates;
+    const candCoords = candidate.location?.coordinates;
+    if (!sourceCoords || !candCoords) {
+      continue;
+    }
+    const distanceKm = calculateDistanceKm(sourceCoords, candCoords);
 
     const pairMaxRadius = (sourceRequest.radiusKm || 3) + (candidate.radiusKm || 3);
     if (distanceKm > pairMaxRadius) {

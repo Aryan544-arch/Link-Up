@@ -104,11 +104,18 @@ export default function SignupPage() {
         password: formData.password,
       });
 
+      const devToken = response.data?.meta?.devVerificationToken || null;
+      const devLink = response.data?.meta?.devVerificationLink || null;
+      const emailDelivered = Boolean(response.data?.meta?.emailDelivered);
+
       // Successful registration: transition to email verification
       navigate('/verify-email', { 
         state: { 
           email: formData.email.trim().toLowerCase(),
-          message: response.data?.message || 'Registration submitted! Please verify your email.' 
+          message: response.data?.message || 'Registration submitted! Please verify your email.',
+          devToken,
+          devLink,
+          emailDelivered
         } 
       });
     } catch (err) {

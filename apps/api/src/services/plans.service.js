@@ -100,8 +100,29 @@ async function getMyPlans({ userId, query = {} }) {
     proposalsPromise
   ]);
 
+  // Calculate pending join request counts for each organized activity
+  const organizedActivityIds = rawOrganized.map((act) => act._id);
+  let pendingCountMap = new Map();
+  if (organizedActivityIds.length > 0 && mongoose.connection.readyState === 1) {
+    try {
+      const pendingCounts = await JoinRequest.aggregate([
+        { $match: { activityId: { $in: organizedActivityIds }, status: 'pending' } },
+        { $group: { _id: '$activityId', count: { $sum: 1 } } }
+      ]);
+      if (Array.isArray(pendingCounts)) {
+        pendingCountMap = new Map(pendingCounts.map((p) => [p._id.toString(), p.count]));
+      }
+    } catch (_) {
+      // Graceful fallback if aggregation is unavailable in mock unit tests
+    }
+  }
+
   // Serialize organized activities: User IS organizer -> precise coordinates preserved
-  const organized = rawOrganized.map((act) => serializeActivity(act, userId));
+  const organized = rawOrganized.map((act) => {
+    const serialized = serializeActivity(act, userId);
+    serialized.pendingRequestsCount = pendingCountMap.get(act._id.toString()) || 0;
+    return serialized;
+  });
 
   // Serialize joined activities: User is attendee (NOT organizer) -> exact coordinates masked
   // Handle missing/deleted activity references safely

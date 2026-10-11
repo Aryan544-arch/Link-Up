@@ -1,6 +1,8 @@
+const mongoose = require('mongoose');
 const JoinRequest = require('../models/JoinRequest');
 const Activity = require('../models/Activity');
-const { dispatchNotificationAsync } = require('./notification.service');
+const User = require('../models/User');
+const { createNotification, dispatchNotificationAsync } = require('./notification.service');
 
 /**
  * Creates a join request for a published activity.
@@ -73,6 +75,19 @@ async function requestToJoin({ activityId, userId, note = null }) {
     throw err;
   }
 
+  // Look up applicant name for notifications if DB is connected
+  let applicantName = 'A participant';
+  if (mongoose.connection && mongoose.connection.readyState === 1) {
+    try {
+      const applicant = await User.findById(userId).select('displayName').lean().exec();
+      if (applicant && applicant.displayName) {
+        applicantName = applicant.displayName;
+      }
+    } catch (_) {
+      // In mock test environments or db read failure, fallback gracefully
+    }
+  }
+
   // Case 1: Instant Join (approvalRequired === false)
   if (!activity.approvalRequired) {
     // Atomic capacity increment
@@ -104,16 +119,28 @@ async function requestToJoin({ activityId, userId, note = null }) {
       });
       await joinRequest.save();
 
-      // Asynchronously dispatch notification to organizer
-      dispatchNotificationAsync({
-        recipientId: activity.organizerId,
-        type: 'JOIN_REQUEST_RECEIVED',
-        title: 'New Participant Joined',
-        message: `A new participant joined "${activity.title}".`,
-        relatedResourceId: activity._id,
-        relatedResourceType: 'activity',
-        metadata: { requestId: joinRequest._id }
-      });
+      // Create in-app notification for the organizer
+      try {
+        await createNotification({
+          recipientId: activity.organizerId,
+          type: 'JOIN_REQUEST_RECEIVED',
+          title: 'New Participant Joined',
+          message: `${applicantName} joined "${activity.title}".`,
+          relatedResourceId: activity._id,
+          relatedResourceType: 'activity',
+          metadata: { requestId: joinRequest._id, applicantId: userId, applicantName }
+        });
+      } catch (notifErr) {
+        dispatchNotificationAsync({
+          recipientId: activity.organizerId,
+          type: 'JOIN_REQUEST_RECEIVED',
+          title: 'New Participant Joined',
+          message: `${applicantName} joined "${activity.title}".`,
+          relatedResourceId: activity._id,
+          relatedResourceType: 'activity',
+          metadata: { requestId: joinRequest._id, applicantId: userId, applicantName }
+        });
+      }
 
       return joinRequest;
     } catch (dbErr) {
@@ -143,16 +170,28 @@ async function requestToJoin({ activityId, userId, note = null }) {
     });
     await joinRequest.save();
 
-    // Asynchronously dispatch notification to organizer
-    dispatchNotificationAsync({
-      recipientId: activity.organizerId,
-      type: 'JOIN_REQUEST_RECEIVED',
-      title: 'New Join Request',
-      message: `Someone requested to join "${activity.title}".`,
-      relatedResourceId: activity._id,
-      relatedResourceType: 'activity',
-      metadata: { requestId: joinRequest._id }
-    });
+    // Create in-app notification for the organizer
+    try {
+      await createNotification({
+        recipientId: activity.organizerId,
+        type: 'JOIN_REQUEST_RECEIVED',
+        title: 'New Join Request',
+        message: `${applicantName} requested to join "${activity.title}".`,
+        relatedResourceId: activity._id,
+        relatedResourceType: 'activity',
+        metadata: { requestId: joinRequest._id, applicantId: userId, applicantName }
+      });
+    } catch (notifErr) {
+      dispatchNotificationAsync({
+        recipientId: activity.organizerId,
+        type: 'JOIN_REQUEST_RECEIVED',
+        title: 'New Join Request',
+        message: `${applicantName} requested to join "${activity.title}".`,
+        relatedResourceId: activity._id,
+        relatedResourceType: 'activity',
+        metadata: { requestId: joinRequest._id, applicantId: userId, applicantName }
+      });
+    }
 
     return joinRequest;
   } catch (dbErr) {

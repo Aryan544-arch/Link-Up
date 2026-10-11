@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Clock, Users, ArrowUpRight, DollarSign } from 'lucide-react';
+import { formatDisplayArea } from '../../lib/locationUtils';
 
 /**
  * Format timestamp into friendly date/time representation
@@ -61,7 +62,7 @@ export default function ActivityCard({ activity, onSelect }) {
   const activityId = id || _id;
   const organizerDisplay = organizer?.displayName || organizerName || 'LinkUp Organizer';
   const displayBudget = budget || cost || 'Free';
-  const meetingArea = displayArea || area;
+  const meetingArea = formatDisplayArea(displayArea || area, activity.location?.coordinates);
   const badgeClass = getCategoryBadgeClass(category);
 
   // Compute spots available defensively

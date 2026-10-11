@@ -38,5 +38,11 @@ export async function planActivity(payload) {
   if (plan && data?.source && !plan.source) {
     plan.source = data.source;
   }
+  if (plan && data?.provider && !plan.provider) {
+    plan.provider = data.provider;
+  }
+  if (plan && data?.disclaimer && !plan.disclaimer) {
+    plan.disclaimer = data.disclaimer;
+  }
   return plan;
 }

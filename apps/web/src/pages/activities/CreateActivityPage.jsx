@@ -6,6 +6,7 @@ import { planActivity } from '../../lib/aiApi';
 import { normalizeApiError } from '../../lib/api';
 import FormInput from '../../components/common/FormInput';
 import AlertBanner from '../../components/common/AlertBanner';
+import { isSecureContextSupported, POPULAR_AREAS } from '../../lib/locationUtils';
 import {
   PlusCircle,
   Calendar,
@@ -83,6 +84,17 @@ function minutesToDurationString(mins) {
   return 'Half day (4+ hours)';
 }
 
+function durationStringToMinutes(durationStr) {
+  if (durationStr === '30 minutes') return 30;
+  if (durationStr === '1 hour') return 60;
+  if (durationStr === '1.5 hours') return 90;
+  if (durationStr === '2 hours') return 120;
+  if (durationStr === '2.5 hours') return 150;
+  if (durationStr === '3 hours') return 180;
+  if (durationStr === 'Half day (4+ hours)') return 240;
+  return 90;
+}
+
 function calculateEndsAt(startDate, durationStr) {
   let minutes = 90; // default 1.5 hours
   if (durationStr === '30 minutes') minutes = 30;
@@ -154,21 +166,35 @@ export default function CreateActivityPage() {
     setIsGeneratingAiPlan(true);
     setAiPlanNotice(null);
 
+    let numericBudget = 0;
+    if (formData.budgetType === 'paid') {
+      const parsed = parseFloat((formData.costDetails || '').replace(/[^0-9.]/g, ''));
+      numericBudget = !isNaN(parsed) && parsed > 0 ? parsed : 15;
+    }
+
     try {
       const plan = await planActivity({
         prompt: promptToUse,
         category: formData.category,
         locationHint: aiLocationHint.trim() || formData.displayArea.trim() || undefined,
-        targetGroupSize: formData.capacity ? Number(formData.capacity) : undefined
+        targetGroupSize: formData.capacity ? Number(formData.capacity) : 6,
+        budget: numericBudget,
+        skillLevel: formData.skillLevel || undefined,
+        durationMinutes: durationStringToMinutes(formData.duration),
+        date: formData.date || undefined,
+        time: formData.time || undefined
       });
 
       if (plan) {
+        const isPaid = typeof plan.budget === 'number' && plan.budget > 0;
         setFormData((prev) => ({
           ...prev,
           title: plan.title || prev.title,
           description: plan.description || prev.description,
           category: BACKEND_TO_FRONTEND_CATEGORY[plan.category] || prev.category,
           capacity: plan.capacity || plan.suggestedCapacity || prev.capacity,
+          budgetType: isPaid ? 'paid' : 'free',
+          costDetails: isPaid ? `$${plan.budget} per person (shared cost)` : '',
           skillLevel: BACKEND_TO_FRONTEND_SKILL[plan.skillLevel] || prev.skillLevel,
           duration: plan.suggestedDurationMinutes ? minutesToDurationString(plan.suggestedDurationMinutes) : prev.duration,
           displayArea: plan.displayArea || plan.suggestedDisplayArea || prev.displayArea,
@@ -177,9 +203,19 @@ export default function CreateActivityPage() {
             : prev.rules
         }));
 
+        setErrors((prev) => ({
+          ...prev,
+          title: undefined,
+          description: undefined,
+          costDetails: undefined
+        }));
+
+        const isAiSource = plan.source === 'ai';
+        const sourceLabel = isAiSource ? 'AI assistant' : 'Deterministic fallback planner (AI key unconfigured or offline)';
+
         setAiPlanNotice({
           type: 'success',
-          message: `AI suggestions applied for "${plan.title}"! All fields are fully editable below. Review, choose date/time, and acquire location coordinates before saving your draft. (AI drafts are never automatically published.)`
+          message: `${isAiSource ? 'AI Plan Applied' : 'Deterministic Plan Draft Applied'} for "${plan.title}" (source: ${sourceLabel}). All fields are fully editable below. (Drafts are never automatically published.)`
         });
       }
     } catch (err) {
@@ -209,6 +245,13 @@ export default function CreateActivityPage() {
 
   // Acquire coordinates from browser geolocation
   const handleAcquireLocation = () => {
+    if (!isSecureContextSupported()) {
+      setCoordStatus('failed');
+      setCoordError('Browser geolocation requires HTTPS or localhost. On LAN HTTP (e.g. 10.162.61.69), please select a landmark or enter coordinates manually below.');
+      setShowManualCoords(true);
+      return;
+    }
+
     if (!navigator.geolocation) {
       setCoordStatus('failed');
       setCoordError('Geolocation is not supported by your browser. Please enter coordinates manually.');
@@ -683,12 +726,22 @@ export default function CreateActivityPage() {
               <input
                 type="text"
                 className="form-control"
-                style={{ flex: '1 1 240px', minWidth: '200px', backgroundColor: '#ffffff' }}
+                style={{ flex: '2 1 240px', minWidth: '200px', backgroundColor: '#ffffff' }}
                 placeholder="e.g. Sunset Spikeball scrimmage in the park"
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
                 disabled={isGeneratingAiPlan || isSubmitting}
                 aria-label="AI activity prompt"
+              />
+              <input
+                type="text"
+                className="form-control"
+                style={{ flex: '1 1 140px', minWidth: '120px', backgroundColor: '#ffffff' }}
+                placeholder="Location (optional)"
+                value={aiLocationHint}
+                onChange={(e) => setAiLocationHint(e.target.value)}
+                disabled={isGeneratingAiPlan || isSubmitting}
+                aria-label="AI location hint"
               />
               <button
                 type="button"
@@ -890,6 +943,36 @@ export default function CreateActivityPage() {
                 required
                 disabled={isSubmitting}
               />
+
+              <div style={{ marginTop: 'var(--space-2)', marginBottom: 'var(--space-3)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)', alignItems: 'center' }}>
+                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginRight: '4px' }}>
+                  Popular landmarks:
+                </span>
+                {POPULAR_AREAS.slice(0, 5).map((area) => (
+                  <button
+                    key={area.name}
+                    type="button"
+                    className="btn btn-ghost btn-xs"
+                    style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '12px', border: '1px solid var(--border-color)' }}
+                    onClick={() => {
+                      setFormData((prev) => ({ ...prev, displayArea: area.displayArea }));
+                      const newCoords = { lat: area.lat, lng: area.lng };
+                      setCoords(newCoords);
+                      setManualCoords({ lat: String(area.lat), lng: String(area.lng) });
+                      setCoordStatus('acquired');
+                      setCoordError(null);
+                      if (errors.coords) {
+                        setErrors((prev) => ({ ...prev, coords: undefined }));
+                      }
+                      if (errors.displayArea) {
+                        setErrors((prev) => ({ ...prev, displayArea: undefined }));
+                      }
+                    }}
+                  >
+                    📍 {area.displayArea.split(',')[0]}
+                  </button>
+                ))}
+              </div>
 
               {/* Coordinates Acquisition (Required by backend GeoJSON format) */}
               <div className="form-group" style={{ marginTop: 'var(--space-4)' }}>

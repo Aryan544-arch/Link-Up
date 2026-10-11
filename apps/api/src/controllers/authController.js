@@ -15,9 +15,18 @@ async function register(req, res, next) {
       req.session.userId = newUser._id ? newUser._id.toString() : newUser.id;
     }
 
+    const isDev = process.env.NODE_ENV !== 'production';
+
     res.status(201).json({
       success: true,
-      data: toPublicUser(newUser)
+      data: toPublicUser(newUser),
+      meta: {
+        emailDelivered: Boolean(newUser.emailDelivered),
+        ...(isDev && newUser.devToken ? {
+          devVerificationToken: newUser.devToken,
+          devVerificationLink: newUser.devVerificationLink
+        } : {})
+      }
     });
   } catch (err) {
     next(err);
@@ -79,6 +88,19 @@ async function verifyEmail(req, res, next) {
     const validatedData = verifyEmailSchema.parse({ token });
 
     const updatedUser = await verifyEmailToken(validatedData.token);
+
+    // Auto-authenticate verified user into session
+    if (req.session) {
+      req.session.userId = updatedUser._id ? updatedUser._id.toString() : updatedUser.id;
+      if (typeof req.session.save === 'function') {
+        await new Promise((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) return reject(err);
+            resolve();
+          });
+        });
+      }
+    }
 
     res.status(200).json({
       success: true,

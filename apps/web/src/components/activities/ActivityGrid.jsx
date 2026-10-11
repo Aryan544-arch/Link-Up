@@ -14,6 +14,7 @@ export default function ActivityGrid({
   pagination = null,
   onLoadMore,
   isLoadingMore = false,
+  onPostInterest,
 }) {
   // Loading Skeleton State
   if (isLoading && activities.length === 0) {
@@ -36,18 +37,29 @@ export default function ActivityGrid({
 
   // Error State (Network failure or Server error)
   if (error) {
+    const isCoordsRequired = error.code === 'COORDINATES_REQUIRED' ||
+      (typeof error.message === 'string' && error.message.includes('Coordinates (lat, lng) are required'));
+
     return (
       <div style={{ padding: 'var(--space-6) 0' }}>
         <AlertBanner
-          type="error"
-          title={error.isNetworkError ? "Backend Server Unavailable" : "Failed to Load Activities"}
+          type={isCoordsRequired ? 'warning' : 'error'}
+          title={
+            error.isNetworkError
+              ? 'Backend Server Unavailable'
+              : isCoordsRequired
+              ? 'Location Required for Radius Filter'
+              : 'Failed to Load Activities'
+          }
           message={
             error.isNetworkError
-              ? "The LinkUp REST API (http://localhost:3000) could not be reached. Ensure the backend server is running and try again."
-              : error.message || "An unexpected error occurred while fetching activities."
+              ? 'The LinkUp REST API could not be reached. Ensure the backend server is running and try again.'
+              : isCoordsRequired
+              ? 'To filter activities by search radius, please enable device GPS or choose a neighborhood above. Alternatively, reset filters to browse all meetups.'
+              : error.message || 'An unexpected error occurred while fetching activities.'
           }
-          onRetry={onRetry}
-          retryLabel="Retry Connection"
+          onRetry={isCoordsRequired && onResetFilters ? onResetFilters : onRetry}
+          retryLabel={isCoordsRequired ? 'Reset Filters' : 'Retry Connection'}
         />
       </div>
     );
@@ -78,11 +90,23 @@ export default function ActivityGrid({
             </button>
           )}
 
-          <Link to="/signup" className="btn btn-accent">
-            <Sparkles size={16} aria-hidden="true" />
-            <span>Post an Interest Request</span>
-            <ArrowRight size={14} aria-hidden="true" />
-          </Link>
+          {onPostInterest ? (
+            <button
+              type="button"
+              className="btn btn-accent"
+              onClick={onPostInterest}
+            >
+              <Sparkles size={16} aria-hidden="true" />
+              <span>Post an Interest Request</span>
+              <ArrowRight size={14} aria-hidden="true" />
+            </button>
+          ) : (
+            <Link to="/plans" className="btn btn-accent">
+              <Sparkles size={16} aria-hidden="true" />
+              <span>Post an Interest Request</span>
+              <ArrowRight size={14} aria-hidden="true" />
+            </Link>
+          )}
         </div>
       </div>
     );

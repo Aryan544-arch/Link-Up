@@ -269,5 +269,49 @@ describe('MEETUP Pulse — Authentication Endpoints', () => {
       assert.equal(res.body.success, false);
       assert.equal(res.body.error.code, 'UNAUTHORIZED');
     });
+
+    it('Allows user to log back in with original credentials after logout', async () => {
+      await User.create({
+        displayName: 'ReLogin User',
+        email: 'relogin@auth-test.example.com',
+        passwordHash: await bcrypt.hash('Secret12345!', 10),
+        isVerified: true
+      });
+
+      // Step 1: Initial login
+      const firstLogin = await request(app)
+        .post('/api/auth/login')
+        .send({
+          email: 'relogin@auth-test.example.com',
+          password: 'Secret12345!'
+        });
+      assert.equal(firstLogin.status, 200);
+      const firstCookie = firstLogin.headers['set-cookie'];
+
+      // Step 2: Logout
+      const logoutRes = await request(app)
+        .post('/api/auth/logout')
+        .set('Cookie', firstCookie);
+      assert.equal(logoutRes.status, 200);
+
+      // Step 3: Re-login with the same credentials
+      const secondLogin = await request(app)
+        .post('/api/auth/login')
+        .send({
+          email: 'relogin@auth-test.example.com',
+          password: 'Secret12345!'
+        });
+      assert.equal(secondLogin.status, 200);
+      assert.equal(secondLogin.body.success, true);
+      const secondCookie = secondLogin.headers['set-cookie'];
+      assert.ok(secondCookie);
+
+      // Step 4: Verify authenticated session operates properly
+      const meRes = await request(app)
+        .get('/api/auth/me')
+        .set('Cookie', secondCookie);
+      assert.equal(meRes.status, 200);
+      assert.equal(meRes.body.data.displayName, 'ReLogin User');
+    });
   });
 });

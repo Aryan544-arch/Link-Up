@@ -19,6 +19,10 @@ async function createNotification(payload) {
     throw new Error('Notification requires a recipientId.');
   }
 
+  if (mongoose.connection && mongoose.connection.readyState !== 1) {
+    return null;
+  }
+
   const notification = new Notification({
     recipientId: payload.recipientId,
     type: payload.type,

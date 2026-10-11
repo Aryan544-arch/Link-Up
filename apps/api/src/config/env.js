@@ -8,7 +8,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
-  CLIENT_ORIGIN: z.string().default('http://localhost:5173'),
+  CLIENT_ORIGIN: z.string().default('http://localhost:5173,http://localhost:5175'),
   MONGODB_URI: z.string().default('mongodb://127.0.0.1:27017/meetup_pulse'),
   SESSION_SECRET: z.string().min(16).default('meetup-pulse-dev-secret-key-at-least-16-chars'),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60 * 1000),

@@ -50,11 +50,15 @@ async function registerUser({ displayName, email, password }) {
   await newUser.save();
 
   // Dispatch email with rawToken (only hash is stored in database)
-  await emailService.sendVerificationEmail({
+  const emailResult = await emailService.sendVerificationEmail({
     email: normalizedEmail,
     displayName: newUser.displayName,
     rawToken
   });
+
+  newUser.devToken = emailResult?.rawToken || null;
+  newUser.devVerificationLink = emailResult?.link || null;
+  newUser.emailDelivered = Boolean(emailResult?.delivered);
 
   return newUser;
 }
@@ -116,10 +120,10 @@ async function verifyEmailToken(rawToken) {
 async function authenticateUser({ email, password }) {
   const normalizedEmail = email.trim().toLowerCase();
 
-  // Explicitly include passwordHash (select: false in schema)
+  // Explicitly include passwordHash and verificationToken (both select: false in schema)
   let query = User.findOne({ email: normalizedEmail });
   if (query && typeof query.select === 'function') {
-    query = query.select('+passwordHash');
+    query = query.select('+passwordHash +verificationToken');
   }
   const user = query && typeof query.exec === 'function' ? await query.exec() : await query;
 

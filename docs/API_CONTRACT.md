@@ -91,7 +91,7 @@ Paginated collection endpoints nest both the entity list and pagination metadata
   - *Status:* **Unverified in production.** Automated backend tests currently inject route-level authentication middleware or mock `req.user`. End-to-end cookie persistence across browser refresh and login/logout routes are awaiting Person 3's implementation.
 - **Frontend Requirement (Person 1):**
   - Axios and browser fetch calls must set `withCredentials: true` (`credentials: 'include'`) on all requests to ensure session cookies are passed across origins.
-  - Express CORS is configured to allow `CLIENT_ORIGIN` (default `http://localhost:5173`) with `credentials: true`.
+  - Express CORS is configured to allow `CLIENT_ORIGIN` (allowing comma-separated origins, defaulting to `http://localhost:5173,http://localhost:5175` in development) with `credentials: true`.
 
 ### 2.2 Shared User Model Contract (Persons 2 & 3)
 - **Model Name:** `'User'`

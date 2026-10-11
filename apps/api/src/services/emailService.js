@@ -41,6 +41,7 @@ async function sendVerificationEmail({ email, displayName, rawToken }) {
 
   return {
     delivered: isSmtpConfigured,
+    rawToken: env.NODE_ENV !== 'production' ? rawToken : null,
     link: env.NODE_ENV !== 'production' ? verificationLink : null
   };
 }

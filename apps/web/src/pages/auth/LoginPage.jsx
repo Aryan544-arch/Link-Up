@@ -110,6 +110,12 @@ export default function LoginPage() {
           title: 'Authentication Failed',
           message: 'Invalid email or password. Please verify your credentials and try again.',
         });
+      } else if (err.code === 'EMAIL_NOT_VERIFIED' || err.status === 403) {
+        setLoginAlert({
+          type: 'warning',
+          title: 'Email Verification Required',
+          message: 'Please verify your email address before logging in. If testing locally without SMTP, check the backend console for the verification link.',
+        });
       } else {
         setLoginAlert({
           type: 'error',

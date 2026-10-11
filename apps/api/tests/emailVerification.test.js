@@ -200,5 +200,18 @@ describe('MEETUP Pulse — Email Verification Flow', () => {
     assert.equal(verifyRes.status, 200);
     assert.equal(verifyRes.body.success, true);
     assert.equal(verifyRes.body.data.isVerified, true);
+
+    // Verify session cookie was issued so user is automatically authenticated
+    const cookie = verifyRes.headers['set-cookie'];
+    assert.ok(cookie);
+    const cookieStr = Array.isArray(cookie) ? cookie.join('; ') : cookie;
+    assert.ok(cookieStr.includes('connect.sid='));
+
+    // Verify accessing /api/auth/me succeeds with this session cookie
+    const meRes = await request(app)
+      .get('/api/auth/me')
+      .set('Cookie', cookie);
+    assert.equal(meRes.status, 200);
+    assert.equal(meRes.body.data.displayName, 'Post Verifier');
   });
 });

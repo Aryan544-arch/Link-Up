@@ -75,7 +75,8 @@ async function seedDatabase({ silent = false } = {}) {
       coordinates: [-73.9665, 40.7812]
     },
     notificationPreferences: { inApp: true, email: true, push: false },
-    gender: 'female'
+    gender: 'female',
+    isVerified: true
   });
   // Bypass mongoose pre-save hash since we already hashed
   alice.$isNew = true;
@@ -95,7 +96,8 @@ async function seedDatabase({ silent = false } = {}) {
       coordinates: [-73.9712, 40.7505]
     },
     notificationPreferences: { inApp: true, email: false, push: false },
-    gender: 'male'
+    gender: 'male',
+    isVerified: true
   });
   await User.collection.insertOne(bob.toObject());
 
@@ -113,7 +115,8 @@ async function seedDatabase({ silent = false } = {}) {
       coordinates: [-73.9880, 40.7180]
     },
     notificationPreferences: { inApp: true, email: true, push: false },
-    gender: 'male'
+    gender: 'male',
+    isVerified: true
   });
   await User.collection.insertOne(charlie.toObject());
 
@@ -131,7 +134,8 @@ async function seedDatabase({ silent = false } = {}) {
       coordinates: [-73.9973, 40.7308]
     },
     notificationPreferences: { inApp: true, email: false, push: false },
-    gender: 'prefer-not-to-say'
+    gender: 'prefer-not-to-say',
+    isVerified: true
   });
   await User.collection.insertOne(dana.toObject());
 

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import apiClient, { normalizeApiError } from '../lib/api';
-import { loginRequest, logoutRequest } from '../lib/authApi';
+import { normalizeApiError } from '../lib/api';
+import { getCurrentUserRequest, loginRequest, logoutRequest, extractUserData } from '../lib/authApi';
 
 /**
  * Authentication Context for LinkUp
@@ -37,9 +37,9 @@ export function AuthProvider({ children }) {
     setError(null);
 
     try {
-      const response = await apiClient.get('/api/auth/me');
-      // Server returns user data on HTTP 200
-      const userData = response.data?.user || response.data;
+      const response = await getCurrentUserRequest();
+      // Server returns user data inside envelope data property on HTTP 200
+      const userData = extractUserData(response);
       setUser(userData);
       setStatus(AuthStatus.AUTHENTICATED);
       return { success: true, user: userData };
@@ -75,7 +75,7 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (credentials) => {
     try {
       const response = await loginRequest(credentials);
-      const userData = response.data?.user || response.data;
+      const userData = extractUserData(response);
       setUser(userData);
       setStatus(AuthStatus.AUTHENTICATED);
       setError(null);

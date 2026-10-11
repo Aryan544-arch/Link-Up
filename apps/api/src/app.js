@@ -21,7 +21,106 @@ const userRoutes = require('./routes/userRoutes');
 const { attachSessionUser } = require('./middleware/auth.integration');
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 
-function createApp({ authMiddleware, optionalAuthMiddleware, sessionStore } = {}) {
+/**
+ * Determines whether a hostname corresponds to localhost, IPv4 loopback,
+ * or a private IPv4 LAN address according to RFC 1918 / RFC 3330.
+ *
+ * Private IPv4 blocks:
+ * - 10.0.0.0/8 (10.0.0.0 - 10.255.255.255), e.g. 10.162.61.69
+ * - 172.16.0.0/12 (172.16.0.0 - 172.31.255.255)
+ * - 192.168.0.0/16 (192.168.0.0 - 192.168.255.255)
+ * - 127.0.0.0/8 (127.0.0.0 - 127.255.255.255, loopback)
+ */
+function isPrivateOrLocalHost(hostname) {
+  if (typeof hostname !== 'string') return false;
+  const h = hostname.trim().toLowerCase();
+  if (h === 'localhost') return true;
+  // 127.0.0.0/8 (loopback)
+  if (/^127(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/.test(h)) return true;
+  // 10.0.0.0/8 (private Class A, e.g. 10.162.61.69)
+  if (/^10(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/.test(h)) return true;
+  // 172.16.0.0/12 (private Class B, 172.16.0.0 - 172.31.255.255)
+  if (/^172\.(?:1[6-9]|2[0-9]|3[0-1])(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){2}$/.test(h)) return true;
+  // 192.168.0.0/16 (private Class C, 192.168.0.0 - 192.168.255.255)
+  if (/^192\.168(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){2}$/.test(h)) return true;
+  return false;
+}
+
+function isAllowedLocalDevOrigin(origin) {
+  if (typeof origin !== 'string' || !origin.trim()) return false;
+  try {
+    const parsed = new URL(origin);
+    // Strictly require http or https protocol
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+    // Strictly require that origin has no path, query, hash, or embedded credentials
+    if (origin !== `${parsed.protocol}//${parsed.host}`) return false;
+    // Verify hostname is localhost, loopback, or private IPv4 LAN
+    if (!isPrivateOrLocalHost(parsed.hostname)) return false;
+    // Validate port is in valid range (1 - 65535)
+    const port = parsed.port ? parseInt(parsed.port, 10) : (parsed.protocol === 'https:' ? 443 : 80);
+    return port > 0 && port <= 65535;
+  } catch {
+    return false;
+  }
+}
+
+function parseConfiguredOrigins(clientOrigin) {
+  if (Array.isArray(clientOrigin)) {
+    return clientOrigin
+      .map((o) => (typeof o === 'string' ? o.trim() : ''))
+      .filter((o) => Boolean(o) && o !== '*');
+  }
+  if (typeof clientOrigin === 'string') {
+    return clientOrigin
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter((origin) => Boolean(origin) && origin !== '*');
+  }
+  return [];
+}
+
+function createCorsOriginValidator(clientOrigin = env.CLIENT_ORIGIN, nodeEnv = env.NODE_ENV) {
+  const isProduction = nodeEnv === 'production';
+  const configuredOrigins = parseConfiguredOrigins(clientOrigin);
+
+  return function corsOriginValidator(origin, callback) {
+    // 1. Non-browser / same-origin requests without an Origin header
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    // 2. Explicitly configured trusted origins (valid across all environments)
+    if (configuredOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // 3. In non-production environments only, accept legitimate local dev frontend origins
+    //    with dynamically assigned ports on localhost or 127.0.0.1
+    if (!isProduction && isAllowedLocalDevOrigin(origin)) {
+      return callback(null, true);
+    }
+
+    // 4. Reject all unconfigured external or arbitrary origins
+    return callback(null, false);
+  };
+}
+
+function resolveAllowedOrigins(clientOrigin, nodeEnv = env.NODE_ENV) {
+  const configured = parseConfiguredOrigins(clientOrigin);
+
+  if (nodeEnv !== 'production') {
+    const devDefaults = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'];
+    for (const devOrigin of devDefaults) {
+      if (!configured.includes(devOrigin)) {
+        configured.push(devOrigin);
+      }
+    }
+  }
+
+  return configured.length > 0 ? configured : ['http://localhost:5173'];
+}
+
+function createApp({ authMiddleware, optionalAuthMiddleware, sessionStore, corsOrigin } = {}) {
   const app = express();
 
   // Trust proxy in production
@@ -33,9 +132,13 @@ function createApp({ authMiddleware, optionalAuthMiddleware, sessionStore } = {}
   app.use(helmet());
 
   // CORS configuration
+  const originValidator = corsOrigin !== undefined
+    ? (typeof corsOrigin === 'function' ? corsOrigin : createCorsOriginValidator(corsOrigin, env.NODE_ENV))
+    : createCorsOriginValidator(env.CLIENT_ORIGIN, env.NODE_ENV);
+
   app.use(
     cors({
-      origin: env.CLIENT_ORIGIN,
+      origin: originValidator,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization']
@@ -125,11 +228,10 @@ function createApp({ authMiddleware, optionalAuthMiddleware, sessionStore } = {}
       : authRoutes
   );
 
-  // Core Marketplace and Activity routes (Person 2)
-  app.use(
-    '/api/activities',
-    createActivityRouter({ authMiddleware, optionalAuthMiddleware })
-  );
+  // Core Marketplace and Activity / Contest routes (Person 2)
+  const activityRouter = createActivityRouter({ authMiddleware, optionalAuthMiddleware });
+  app.use('/api/activities', activityRouter);
+  app.use('/api/contests', activityRouter);
   app.use(
     '/api/join-requests',
     createJoinRequestRouter({ authMiddleware })
@@ -188,3 +290,8 @@ const app = createApp();
 module.exports = app;
 module.exports.createApp = createApp;
 module.exports.app = app;
+module.exports.resolveAllowedOrigins = resolveAllowedOrigins;
+module.exports.createCorsOriginValidator = createCorsOriginValidator;
+module.exports.isAllowedLocalDevOrigin = isAllowedLocalDevOrigin;
+module.exports.isPrivateOrLocalHost = isPrivateOrLocalHost;
+module.exports.parseConfiguredOrigins = parseConfiguredOrigins;

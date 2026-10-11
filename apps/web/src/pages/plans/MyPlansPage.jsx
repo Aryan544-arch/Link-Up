@@ -11,6 +11,7 @@ import {
 import { normalizeApiError } from '../../lib/api';
 import ActivityCard from '../../components/activities/ActivityCard';
 import AlertBanner from '../../components/common/AlertBanner';
+import { formatDisplayArea } from '../../lib/locationUtils';
 import {
   Calendar,
   Compass,
@@ -398,9 +399,19 @@ export default function MyPlansPage() {
                             borderRadius: 'var(--radius-md)',
                             border: '1px solid var(--border-color)',
                             display: 'flex',
-                            justifyContent: 'flex-end',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
                           }}
                         >
+                          <Link
+                            to={`/activities/${key}`}
+                            className={`btn ${act.pendingRequestsCount > 0 ? 'btn-primary' : 'btn-outline'} btn-sm`}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+                            aria-label="Manage participant join requests"
+                          >
+                            <Users size={14} aria-hidden="true" />
+                            <span>Manage Requests{act.pendingRequestsCount > 0 ? ` (${act.pendingRequestsCount} pending)` : ''}</span>
+                          </Link>
                           <button
                             type="button"
                             className="btn btn-ghost btn-sm"
@@ -586,12 +597,10 @@ export default function MyPlansPage() {
                       <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--text-primary)' }}>
                         {title}
                       </h3>
-                      {item.displayArea && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
-                          <MapPin size={12} aria-hidden="true" />
-                          <span>{item.displayArea}</span>
-                        </div>
-                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
+                        <MapPin size={12} aria-hidden="true" />
+                        <span>{formatDisplayArea(item.displayArea, item.location?.coordinates)}</span>
+                      </div>
                       {(item.timeStart || item.timeEnd) && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
                           <Clock size={12} aria-hidden="true" />
@@ -638,7 +647,7 @@ export default function MyPlansPage() {
 
                   const draft = item.activityDraft || {};
                   const title = draft.title || item.title || 'Activity Proposal';
-                  const area = draft.displayArea || item.displayArea;
+                  const area = formatDisplayArea(draft.displayArea || item.displayArea, draft.location?.coordinates || item.location?.coordinates);
                   const startsAt = draft.startsAt || item.startsAt;
                   const description = draft.description || item.description;
                   const capacity = draft.capacity || item.capacity || 2;

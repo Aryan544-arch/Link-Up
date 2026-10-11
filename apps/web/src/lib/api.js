@@ -10,10 +10,27 @@ import axios from 'axios';
  * - Centralized response-error normalization without disruptive forced redirects on 401.
  */
 
-const API_BASE_URL = 
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) 
-    ? import.meta.env.VITE_API_BASE_URL 
-    : 'http://localhost:3000';
+/**
+ * Resolves the backend API base URL dynamically.
+ * Prioritizes VITE_API_BASE_URL if configured.
+ * In browser runtime, derives the host from window.location.hostname so that
+ * requests from both localhost (http://localhost:5173) and LAN IPs (e.g. http://10.162.61.69:5173)
+ * target the backend at the same host (:3000). This ensures session cookies (connect.sid)
+ * are treated as same-site and delivered reliably with withCredentials: true.
+ */
+export function resolveApiBaseUrl() {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    const protocol = window.location.protocol || 'http:';
+    const hostname = window.location.hostname;
+    return `${protocol}//${hostname}:3000`;
+  }
+  return 'http://localhost:3000';
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
