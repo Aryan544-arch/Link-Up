@@ -199,18 +199,6 @@ function createApp(options = {}) {
     app.use(generalLimiter);
   }
 
-  // Baseline health check endpoint
-  app.get('/api/health', (req, res) => {
-    res.status(200).json({
-      success: true,
-      data: {
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        environment: env.NODE_ENV
-      }
-    });
-  });
-
   // Test-only endpoints to verify session cookie issuance and persistence
   if (isTestMode || env.NODE_ENV === 'test') {
     app.post('/api/test/session', (req, res) => {
