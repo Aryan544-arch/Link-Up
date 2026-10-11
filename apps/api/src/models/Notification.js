@@ -1,5 +1,23 @@
 const mongoose = require('mongoose');
-const { NOTIFICATION_TYPES, RELATED_RESOURCE_TYPES } = require('../constants/notification.constants');
+
+const NOTIFICATION_TYPES = [
+  'join_request_received',
+  'request_approved',
+  'request_rejected',
+  'activity_updated',
+  'activity_cancelled',
+  'match_found',
+  'proposal_created',
+  'general'
+];
+
+const RESOURCE_TYPES = [
+  'activity',
+  'join_request',
+  'interest_request',
+  'proposal',
+  'user'
+];
 
 const notificationSchema = new mongoose.Schema(
   {
@@ -21,47 +39,78 @@ const notificationSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Notification title is required'],
       trim: true,
-      maxlength: [150, 'Title cannot exceed 150 characters']
+      minlength: [1, 'Title cannot be empty'],
+      maxlength: [100, 'Title cannot exceed 100 characters']
     },
     message: {
       type: String,
       required: [true, 'Notification message is required'],
       trim: true,
-      maxlength: [1000, 'Message cannot exceed 1000 characters']
+      minlength: [1, 'Message cannot be empty'],
+      maxlength: [500, 'Message cannot exceed 500 characters']
+    },
+    relatedResourceType: {
+      type: String,
+      enum: {
+        values: [...RESOURCE_TYPES, null],
+        message: 'Invalid related resource type: {VALUE}'
+      },
+      default: null
     },
     relatedResourceId: {
       type: mongoose.Schema.Types.ObjectId,
       default: null
     },
-    relatedResourceType: {
-      type: String,
-      enum: {
-        values: RELATED_RESOURCE_TYPES,
-        message: 'Invalid related resource type: {VALUE}'
-      },
-      default: 'none'
-    },
     readAt: {
       type: Date,
-      default: null,
-      index: true
-    },
-    metadata: {
-      type: mongoose.Schema.Types.Mixed,
       default: null
+    },
+    deduplicationKey: {
+      type: String,
+      sparse: true,
+      unique: true
     }
   },
   {
-    timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true }
+    timestamps: true
   }
 );
 
-// Compound index for querying user notifications sorted by recency and unread state
-notificationSchema.index({ recipientId: 1, readAt: 1, createdAt: -1 });
+// Compound indexes for optimal queries
+notificationSchema.index({ recipientId: 1, createdAt: -1 });
+notificationSchema.index({ recipientId: 1, readAt: 1 });
 
-const Notification =
-  mongoose.models.Notification || mongoose.model('Notification', notificationSchema);
+// Method to format a client-safe public JSON representation
+notificationSchema.methods.toPublicJSON = function () {
+  return {
+    id: this._id.toString(),
+    recipientId: this.recipientId.toString(),
+    type: this.type,
+    title: this.title,
+    message: this.message,
+    relatedResourceType: this.relatedResourceType || null,
+    relatedResourceId: this.relatedResourceId ? this.relatedResourceId.toString() : null,
+    isRead: Boolean(this.readAt),
+    readAt: this.readAt || null,
+    createdAt: this.createdAt,
+    updatedAt: this.updatedAt
+  };
+};
+
+notificationSchema.set('toJSON', {
+  transform: (doc, ret) => {
+    ret.id = ret._id.toString();
+    ret.recipientId = ret.recipientId.toString();
+    ret.isRead = Boolean(ret.readAt);
+    delete ret._id;
+    delete ret.__v;
+    delete ret.deduplicationKey;
+    return ret;
+  }
+});
+
+const Notification = mongoose.model('Notification', notificationSchema);
 
 module.exports = Notification;
+module.exports.NOTIFICATION_TYPES = NOTIFICATION_TYPES;
+module.exports.RESOURCE_TYPES = RESOURCE_TYPES;

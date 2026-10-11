@@ -1,23 +1,14 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const { ACTIVITY_CATEGORIES } = require('../constants/activity.constants');
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Documented search radius boundaries (in kilometers)
+const SEARCH_RADIUS_MIN_KM = 0.5;
+const SEARCH_RADIUS_MAX_KM = 50.0;
+const SEARCH_RADIUS_DEFAULT_KM = 3.0;
 
 const userSchema = new mongoose.Schema(
   {
-    email: {
-      type: String,
-      required: [true, 'Email is required'],
-      unique: true,
-      lowercase: true,
-      trim: true,
-      match: [/^\S+@\S+\.\S+$/, 'Invalid email address format'],
-      index: true
-    },
-    password: {
-      type: String,
-      required: [true, 'Password is required'],
-      minlength: [8, 'Password must be at least 8 characters']
-    },
     displayName: {
       type: String,
       required: [true, 'Display name is required'],
@@ -25,108 +16,86 @@ const userSchema = new mongoose.Schema(
       minlength: [2, 'Display name must be at least 2 characters'],
       maxlength: [50, 'Display name cannot exceed 50 characters']
     },
-    bio: {
+    email: {
       type: String,
+      required: [true, 'Email is required'],
       trim: true,
-      maxlength: [500, 'Bio cannot exceed 500 characters'],
-      default: ''
+      lowercase: true,
+      unique: true,
+      match: [EMAIL_REGEX, 'Please provide a valid email address']
     },
-    avatar: {
+    passwordHash: {
       type: String,
-      trim: true,
-      default: ''
+      required: [true, 'Password hash is required'],
+      select: false // Excluded from normal query results by default
     },
-    interests: {
-      type: [String],
-      enum: {
-        values: ACTIVITY_CATEGORIES,
-        message: 'Invalid activity category in interests: {VALUE}'
-      },
-      default: []
+    isVerified: {
+      type: Boolean,
+      default: false
+    },
+    verificationToken: {
+      type: String,
+      default: null,
+      select: false, // Excluded from normal query results by default
+      index: true
+    },
+    verificationTokenExpiresAt: {
+      type: Date,
+      default: null,
+      select: false // Excluded from normal query results by default
     },
     searchRadiusKm: {
       type: Number,
-      min: [1, 'Search radius must be at least 1 km'],
-      max: [50, 'Search radius cannot exceed 50 km'],
-      default: 3
+      default: SEARCH_RADIUS_DEFAULT_KM,
+      min: [SEARCH_RADIUS_MIN_KM, `Search radius must be at least ${SEARCH_RADIUS_MIN_KM} km`],
+      max: [SEARCH_RADIUS_MAX_KM, `Search radius cannot exceed ${SEARCH_RADIUS_MAX_KM} km`]
     },
-    preferredLocation: {
-      displayArea: {
-        type: String,
-        trim: true,
-        maxlength: [200, 'Display area cannot exceed 200 characters'],
-        default: ''
-      },
-      coordinates: {
-        type: [Number],
-        default: null
-      }
-    },
-    notificationPreferences: {
-      inApp: {
-        type: Boolean,
-        default: true
-      },
-      email: {
-        type: Boolean,
-        default: false
-      },
-      push: {
-        type: Boolean,
-        default: false
-      }
-    },
-    phoneNumber: {
+    preferredArea: {
       type: String,
       trim: true,
-      default: ''
+      maxlength: [100, 'Preferred area cannot exceed 100 characters'],
+      default: null
     },
-    gender: {
-      type: String,
-      trim: true,
-      default: ''
+    interests: {
+      type: [String],
+      default: []
     }
   },
   {
-    timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true }
+    timestamps: true
   }
 );
 
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  try {
-    this.password = await bcrypt.hash(this.password, 10);
-    next();
-  } catch (err) {
-    next(err);
-  }
-});
-
-userSchema.methods.comparePassword = async function (candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
-};
-
-userSchema.methods.toSafeObject = function () {
+// Method to format a public, safe user JSON representation
+userSchema.methods.toPublicJSON = function () {
   return {
-    _id: this._id.toString(),
     id: this._id.toString(),
-    email: this.email,
     displayName: this.displayName,
-    bio: this.bio || '',
-    avatar: this.avatar || '',
-    interests: this.interests || [],
-    searchRadiusKm: this.searchRadiusKm ?? 3,
-    preferredLocation: this.preferredLocation || { displayArea: '', coordinates: null },
-    notificationPreferences: this.notificationPreferences || { inApp: true, email: false, push: false },
-    phoneNumber: this.phoneNumber || '',
-    gender: this.gender || '',
+    email: this.email,
+    isVerified: this.isVerified,
+    searchRadiusKm: this.searchRadiusKm,
+    preferredArea: this.preferredArea,
+    interests: Array.isArray(this.interests) ? this.interests : [],
     createdAt: this.createdAt,
     updatedAt: this.updatedAt
   };
 };
 
-const User = mongoose.models.User || mongoose.model('User', userSchema);
+// Transform toJSON so that private credentials are stripped even if selected explicitly
+userSchema.set('toJSON', {
+  transform: (doc, ret) => {
+    delete ret.passwordHash;
+    delete ret.verificationToken;
+    delete ret.verificationTokenExpiresAt;
+    delete ret.__v;
+    ret.id = ret._id.toString();
+    return ret;
+  }
+});
+
+const User = mongoose.model('User', userSchema);
 
 module.exports = User;
+module.exports.SEARCH_RADIUS_MIN_KM = SEARCH_RADIUS_MIN_KM;
+module.exports.SEARCH_RADIUS_MAX_KM = SEARCH_RADIUS_MAX_KM;
+module.exports.SEARCH_RADIUS_DEFAULT_KM = SEARCH_RADIUS_DEFAULT_KM;
